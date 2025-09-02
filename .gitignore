@@ -44,11 +44,6 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# -------------------------
-# PHP (backend)
-# -------------------------
-vendor/
-composer.lock
 
 # -------------------------
 # Coverage
