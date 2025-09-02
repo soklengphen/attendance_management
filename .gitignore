@@ -1,0 +1,65 @@
+# -------------------------
+# Node.js / pnpm
+# -------------------------
+node_modules/
+**/node_modules/
+.pnpm-store/
+.pnp.*
+.pnp.js
+
+# pnpm lockfile (optional, recommended to commit in team projects)
+# Uncomment the next line if you don't want to commit it
+# pnpm-lock.yaml
+
+# -------------------------
+# Build outputs
+# -------------------------
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# -------------------------
+# Logs
+# -------------------------
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# -------------------------
+# Environment variables
+# -------------------------
+.env
+.env.*
+!.env.example
+
+# -------------------------
+# IDE / Editor files
+# -------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# -------------------------
+# PHP (backend)
+# -------------------------
+vendor/
+composer.lock
+
+# -------------------------
+# Coverage
+# -------------------------
+coverage/
+*.lcov
+
+# -------------------------
+# Cache
+# -------------------------
+.cache/
+.next/
+.nuxt/
+.svelte-kit/
