@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import { Dashboard } from './components/Dashboard';
-import CheckInOut from './components/CheckinOut';
+import  {Dashboard} from './components/Dashboard';
+import CheckInOut from './components/CheckInOut';
 import AttendanceRecords from './components/AttendanceRecords';
-import  UserManagement 
-
- from './components/UserManagement';
+import  UserManagement from './components/UserManagement';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

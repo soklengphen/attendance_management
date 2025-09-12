@@ -13,8 +13,8 @@ interface AttendanceRecord {
   department: string;
   email: string;
   date: string;
-  check_in_time: string | null;
-  check_out_time: string | null;
+  check_in_time: string | null;   // HH:mm or null
+  check_out_time: string | null;  // HH:mm or null
   status: string;
   shift_name: string;
   work_hours: number;
@@ -23,11 +23,56 @@ interface AttendanceRecord {
 }
 
 interface AttendanceResponse {
-  records: AttendanceRecord[];
+  records: any[];
   total: number;
   limit: number;
   offset: number;
 }
+
+// Raw API record (array shape)
+type RawAttendance = {
+  attendance_id: string;
+  user_id: string;
+  date: string;                   // YYYY-MM-DD
+  check_in_time: string | null;   // "YYYY-MM-DD HH:mm:ss" | null
+  check_out_time: string | null;  // same
+  status: string;
+  shift_id?: string | null;
+  work_hours: string;
+  overtime_hours: string;
+  remarks: string | null;
+  created_at: string;
+  updated_at: string;
+  full_name: string;
+  department: string;
+  email: string;
+  shift_name?: string;
+};
+
+// ---- helpers ----
+const toHHmm = (dt: string | null): string | null => {
+  if (!dt) return null;
+  const parts = dt.split(' ');
+  if (parts.length < 2) return null;
+  const [hh, mm] = parts[1].split(':');
+  return hh && mm ? `${hh}:${mm}` : null;
+};
+
+const mapRaw = (r: RawAttendance): AttendanceRecord => ({
+  attendance_id: Number(r.attendance_id),
+  user_id: Number(r.user_id),
+  full_name: r.full_name,
+  department: r.department,
+  email: r.email,
+  date: r.date,
+  check_in_time: toHHmm(r.check_in_time),
+  check_out_time: toHHmm(r.check_out_time),
+  status: r.status,
+  shift_name: r.shift_name ?? 'Shift 1',
+  work_hours: Number.parseFloat(r.work_hours || '0') || 0,
+  overtime_hours: Number.parseFloat(r.overtime_hours || '0') || 0,
+  remarks: r.remarks,
+});
 
 const AttendanceRecords: React.FC = () => {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -35,32 +80,50 @@ const AttendanceRecords: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [limit] = useState(10);
-  
+
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'Present' | 'Late' | 'Absent' | 'On Leave' | 'Half-day'>('all');
   const [dateFilter, setDateFilter] = useState('');
-  
+
   const fetchRecords = async () => {
     setLoading(true);
     try {
       const offset = (currentPage - 1) * limit;
-      const params = new URLSearchParams({
-        limit: limit.toString(),
-        offset: offset.toString(),
-      });
-
-      if (statusFilter) params.append('status', statusFilter);
+      const params = new URLSearchParams();
+      params.append('limit', String(limit));
+      params.append('offset', String(offset));
+      if (statusFilter !== 'all') params.append('status', statusFilter);
       if (dateFilter) params.append('date', dateFilter);
 
-      const response = await fetch(`http://localhost:8000/api/attendance?${params}`);
+      const url = `http://localhost:8000?action=attendance${params.toString() ? `&${params.toString()}` : ''}`;
+      const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch records');
-      
-      const data: AttendanceResponse = await response.json();
-      setRecords(data.records);
-      setTotal(data.total);
+
+      const json = await response.json();
+
+      // Handle both response shapes:
+      // 1) Array<RawAttendance>
+      // 2) { records: Array<RawAttendance>, total, ... }
+      let mapped: AttendanceRecord[] = [];
+      let totalCount = 0;
+
+      if (Array.isArray(json)) {
+        mapped = json.map(mapRaw);
+        totalCount = mapped.length;
+      } else {
+        const data = json as AttendanceResponse;
+        const list = Array.isArray(data.records) ? data.records : [];
+        mapped = list.map(mapRaw);
+        totalCount = typeof data.total === 'number' ? data.total : mapped.length;
+      }
+
+      setRecords(mapped);
+      setTotal(totalCount);
     } catch (error) {
       console.error('Error fetching records:', error);
+      setRecords([]); // ensure not undefined
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -68,42 +131,50 @@ const AttendanceRecords: React.FC = () => {
 
   useEffect(() => {
     fetchRecords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, statusFilter, dateFilter]);
 
   const handleSearch = () => {
     setCurrentPage(1);
-    fetchRecords();
+    // filter happens client-side below
   };
 
+  // client-side search filter (records is always an array)
+  const filteredRecords = records.filter((record) =>
+    record.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    record.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    record.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(total / limit) || 1;
+
   const handleExport = async () => {
+    // Export the current filtered view (all rows shown across pages)
     try {
-      const params = new URLSearchParams();
-      if (statusFilter) params.append('status', statusFilter);
-      if (dateFilter) params.append('date', dateFilter);
-      params.append('limit', '1000'); // Get more records for export
-
-      const response = await fetch(`http://localhost:8000/api/attendance?${params}`);
-      const data: AttendanceResponse = await response.json();
-
-      // Convert to CSV
       const headers = ['Name', 'Department', 'Date', 'Check In', 'Check Out', 'Status', 'Work Hours', 'Overtime', 'Shift', 'Remarks'];
       const csvContent = [
         headers.join(','),
-        ...data.records.map(record => [
-          record.full_name,
-          record.department,
-          record.date,
-          record.check_in_time || '',
-          record.check_out_time || '',
-          record.status,
-          record.work_hours,
-          record.overtime_hours,
-          record.shift_name,
-          record.remarks || ''
-        ].join(','))
+        ...filteredRecords.map((record) =>
+          [
+            record.full_name,
+            record.department,
+            record.date,
+            record.check_in_time || '',
+            record.check_out_time || '',
+            record.status,
+            record.work_hours,
+            record.overtime_hours,
+            record.shift_name,
+            record.remarks || '',
+          ]
+            .map((v) => {
+              const s = String(v);
+              return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+            })
+            .join(',')
+        ),
       ].join('\n');
 
-      // Download
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -118,21 +189,14 @@ const AttendanceRecords: React.FC = () => {
     }
   };
 
-  const formatTime = (timeString: string | null) => {
-    if (!timeString) return 'N/A';
-    return new Date(timeString).toLocaleTimeString('en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
+  const formatTime = (timeString: string | null) => timeString ?? 'N/A';
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (dateString: string) =>
+    new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -145,22 +209,12 @@ const AttendanceRecords: React.FC = () => {
     }
   };
 
-  const totalPages = Math.ceil(total / limit);
-
-  const filteredRecords = records.filter(record =>
-    record.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Attendance Records</h1>
-          <p className="text-muted-foreground">
-            View and manage all attendance records
-          </p>
+          <p className="text-muted-foreground">View and manage all attendance records</p>
         </div>
         <Button onClick={handleExport} variant="outline" className="flex items-center gap-2">
           <Download className="h-4 w-4" />
@@ -185,16 +239,16 @@ const AttendanceRecords: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
-                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               />
             </div>
-            
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as any); setCurrentPage(1); }}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="Present">Present</SelectItem>
                 <SelectItem value="Late">Late</SelectItem>
                 <SelectItem value="Absent">Absent</SelectItem>
@@ -206,7 +260,7 @@ const AttendanceRecords: React.FC = () => {
             <Input
               type="date"
               value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
+              onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
               className="w-full"
             />
 
@@ -263,7 +317,7 @@ const AttendanceRecords: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRecords.map((record) => (
+                    {records.map((record) => (
                       <tr key={record.attendance_id} className="border-b hover:bg-gray-50">
                         <td className="py-4 px-4">
                           <div>
@@ -306,48 +360,31 @@ const AttendanceRecords: React.FC = () => {
                   </tbody>
                 </table>
 
-                {filteredRecords.length === 0 && (
+                {records.length === 0 && (
                   <div className="text-center py-8 text-gray-500">
                     No records found matching your criteria
                   </div>
                 )}
               </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
+              {/* Pagination (server-driven `total`) */}
+              {total > 0 && (
                 <div className="flex items-center justify-between mt-6 pt-4 border-t">
                   <div className="text-sm text-gray-500">
-                    Showing {Math.min((currentPage - 1) * limit + 1, total)} to{' '}
-                    {Math.min(currentPage * limit, total)} of {total} results
+                    Page {currentPage} • {total} total
                   </div>
                   <div className="flex gap-2">
                     <Button
-                      onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
                       variant="outline"
                       size="sm"
                     >
                       Previous
                     </Button>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                        const page = i + Math.max(1, currentPage - 2);
-                        return (
-                          <Button
-                            key={page}
-                            onClick={() => setCurrentPage(page)}
-                            variant={currentPage === page ? "default" : "outline"}
-                            size="sm"
-                            className="w-8 h-8 p-0"
-                          >
-                            {page}
-                          </Button>
-                        );
-                      })}
-                    </div>
                     <Button
-                      onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
-                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                      disabled={currentPage >= totalPages}
                       variant="outline"
                       size="sm"
                     >

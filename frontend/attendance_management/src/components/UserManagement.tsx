@@ -59,7 +59,7 @@ const UserManagement: React.FC = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/users');
+      const response = await fetch('http://localhost:8000?action=users');
       if (!response.ok) throw new Error('Failed to fetch users');
       const data = await response.json();
       setUsers(data);
@@ -75,14 +75,14 @@ const UserManagement: React.FC = () => {
     fetchUsers();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {``
     e.preventDefault();
     setLoading(true);
 
     try {
       const url = editingUser 
-        ? `http://localhost:8000/api/users/${editingUser.user_id}`
-        : 'http://localhost:8000/api/users';
+        ? `http://localhost:8000?action=users&id=${editingUser.user_id}`
+        : 'http://localhost:8000?action=users';
       
       const method = editingUser ? 'PUT' : 'POST';
       
@@ -133,7 +133,7 @@ const UserManagement: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/users/${userId}`, {
+      const response = await fetch(`http://localhost:8000?action=users&id=${userId}`, {
         method: 'DELETE',
       });
 

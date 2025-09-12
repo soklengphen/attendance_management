@@ -33,7 +33,7 @@ const AttendancePage: React.FC = () => {
 
   // ✅ Fetch users
   useEffect(() => {
-    fetch("http://localhost:8080/users")
+    fetch("http://localhost:8000?action=users")
       .then((res) => res.json())
       .then((data) => setUsers(data))
       .catch((err) => console.error("Error fetching users:", err));
@@ -41,7 +41,7 @@ const AttendancePage: React.FC = () => {
 
   // ✅ Fetch shifts
   useEffect(() => {
-    fetch("http://localhost:8080/shifts")
+    fetch("http://localhost:8000?action=shifts")
       .then((res) => res.json())
       .then((data) => setShifts(data))
       .catch((err) => console.error("Error fetching shifts:", err));
@@ -56,7 +56,7 @@ const AttendancePage: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await fetch("http://localhost:8080/attendance/check-in", {
+      const response = await fetch("http://localhost:8000?action=attendance&check-in", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
