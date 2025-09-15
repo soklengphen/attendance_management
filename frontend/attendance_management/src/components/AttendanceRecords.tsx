@@ -1,10 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Search, Filter, Download, Calendar, Clock, User } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import api from "../utils/interceptor"; // Axios instance with JWT interceptor
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Search, Filter, Download, Calendar, Clock, User } from "lucide-react";
 
 interface AttendanceRecord {
   attendance_id: number;
@@ -13,8 +20,8 @@ interface AttendanceRecord {
   department: string;
   email: string;
   date: string;
-  check_in_time: string | null;   // HH:mm or null
-  check_out_time: string | null;  // HH:mm or null
+  check_in_time: string | null;
+  check_out_time: string | null;
   status: string;
   shift_name: string;
   work_hours: number;
@@ -29,13 +36,12 @@ interface AttendanceResponse {
   offset: number;
 }
 
-// Raw API record (array shape)
 type RawAttendance = {
   attendance_id: string;
   user_id: string;
-  date: string;                   // YYYY-MM-DD
-  check_in_time: string | null;   // "YYYY-MM-DD HH:mm:ss" | null
-  check_out_time: string | null;  // same
+  date: string;
+  check_in_time: string | null;
+  check_out_time: string | null;
   status: string;
   shift_id?: string | null;
   work_hours: string;
@@ -52,9 +58,9 @@ type RawAttendance = {
 // ---- helpers ----
 const toHHmm = (dt: string | null): string | null => {
   if (!dt) return null;
-  const parts = dt.split(' ');
+  const parts = dt.split(" ");
   if (parts.length < 2) return null;
-  const [hh, mm] = parts[1].split(':');
+  const [hh, mm] = parts[1].split(":");
   return hh && mm ? `${hh}:${mm}` : null;
 };
 
@@ -68,9 +74,9 @@ const mapRaw = (r: RawAttendance): AttendanceRecord => ({
   check_in_time: toHHmm(r.check_in_time),
   check_out_time: toHHmm(r.check_out_time),
   status: r.status,
-  shift_name: r.shift_name ?? 'Shift 1',
-  work_hours: Number.parseFloat(r.work_hours || '0') || 0,
-  overtime_hours: Number.parseFloat(r.overtime_hours || '0') || 0,
+  shift_name: r.shift_name ?? "Shift 1",
+  work_hours: Number.parseFloat(r.work_hours || "0") || 0,
+  overtime_hours: Number.parseFloat(r.overtime_hours || "0") || 0,
   remarks: r.remarks,
 });
 
@@ -82,29 +88,24 @@ const AttendanceRecords: React.FC = () => {
   const [limit] = useState(10);
 
   // Filters
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'Present' | 'Late' | 'Absent' | 'On Leave' | 'Half-day'>('all');
-  const [dateFilter, setDateFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "Present" | "Late" | "Absent" | "On Leave" | "Half-day"
+  >("all");
+  const [dateFilter, setDateFilter] = useState("");
 
+  // --- Fetch Records ---
   const fetchRecords = async () => {
     setLoading(true);
     try {
       const offset = (currentPage - 1) * limit;
-      const params = new URLSearchParams();
-      params.append('limit', String(limit));
-      params.append('offset', String(offset));
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      if (dateFilter) params.append('date', dateFilter);
+      const params: Record<string, any> = { limit, offset };
+      if (statusFilter !== "all") params.status = statusFilter;
+      if (dateFilter) params.date = dateFilter;
 
-      const url = `http://localhost:8000?action=attendance${params.toString() ? `&${params.toString()}` : ''}`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch records');
+      const response = await api.get("/?action=attendance", { params });
+      const json = response.data;
 
-      const json = await response.json();
-
-      // Handle both response shapes:
-      // 1) Array<RawAttendance>
-      // 2) { records: Array<RawAttendance>, total, ... }
       let mapped: AttendanceRecord[] = [];
       let totalCount = 0;
 
@@ -115,14 +116,15 @@ const AttendanceRecords: React.FC = () => {
         const data = json as AttendanceResponse;
         const list = Array.isArray(data.records) ? data.records : [];
         mapped = list.map(mapRaw);
-        totalCount = typeof data.total === 'number' ? data.total : mapped.length;
+        totalCount =
+          typeof data.total === "number" ? data.total : mapped.length;
       }
 
       setRecords(mapped);
       setTotal(totalCount);
     } catch (error) {
-      console.error('Error fetching records:', error);
-      setRecords([]); // ensure not undefined
+      console.error("Error fetching records:", error);
+      setRecords([]);
       setTotal(0);
     } finally {
       setLoading(false);
@@ -134,89 +136,116 @@ const AttendanceRecords: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, statusFilter, dateFilter]);
 
-  const handleSearch = () => {
-    setCurrentPage(1);
-    // filter happens client-side below
-  };
+  const handleSearch = () => setCurrentPage(1);
 
-  // client-side search filter (records is always an array)
-  const filteredRecords = records.filter((record) =>
-    record.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    record.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredRecords = records.filter(
+    (record) =>
+      record.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(total / limit) || 1;
 
+  // --- Export CSV ---
   const handleExport = async () => {
-    // Export the current filtered view (all rows shown across pages)
     try {
-      const headers = ['Name', 'Department', 'Date', 'Check In', 'Check Out', 'Status', 'Work Hours', 'Overtime', 'Shift', 'Remarks'];
+      const headers = [
+        "Name",
+        "Department",
+        "Date",
+        "Check In",
+        "Check Out",
+        "Status",
+        "Work Hours",
+        "Overtime",
+        "Shift",
+        "Remarks",
+      ];
       const csvContent = [
-        headers.join(','),
+        headers.join(","),
         ...filteredRecords.map((record) =>
           [
             record.full_name,
             record.department,
             record.date,
-            record.check_in_time || '',
-            record.check_out_time || '',
+            record.check_in_time || "",
+            record.check_out_time || "",
             record.status,
             record.work_hours,
             record.overtime_hours,
             record.shift_name,
-            record.remarks || '',
+            record.remarks || "",
           ]
             .map((v) => {
               const s = String(v);
-              return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+              return s.includes(",") || s.includes('"') || s.includes("\n")
+                ? `"${s.replace(/"/g, '""')}"`
+                : s;
             })
-            .join(',')
+            .join(",")
         ),
-      ].join('\n');
+      ].join("\n");
 
-      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const blob = new Blob([csvContent], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `attendance_records_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `attendance_records_${
+        new Date().toISOString().split("T")[0]
+      }.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error exporting data:', error);
+      console.error("Error exporting data:", error);
     }
   };
 
-  const formatTime = (timeString: string | null) => timeString ?? 'N/A';
+  const formatTime = (timeString: string | null) => timeString ?? "N/A";
 
   const formatDate = (dateString: string) =>
-    new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+    new Date(dateString + "T00:00:00").toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Present': return 'bg-green-500 text-white';
-      case 'Late': return 'bg-yellow-500 text-white';
-      case 'Absent': return 'bg-red-500 text-white';
-      case 'On Leave': return 'bg-blue-500 text-white';
-      case 'Half-day': return 'bg-purple-500 text-white';
-      default: return 'bg-gray-500 text-white';
+      case "Present":
+        return "bg-green-500 text-white";
+      case "Late":
+        return "bg-yellow-500 text-white";
+      case "Absent":
+        return "bg-red-500 text-white";
+      case "On Leave":
+        return "bg-blue-500 text-white";
+      case "Half-day":
+        return "bg-purple-500 text-white";
+      default:
+        return "bg-gray-500 text-white";
     }
   };
 
   return (
     <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Attendance Records</h1>
-          <p className="text-muted-foreground">View and manage all attendance records</p>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Attendance Records
+          </h1>
+          <p className="text-muted-foreground">
+            View and manage all attendance records
+          </p>
         </div>
-        <Button onClick={handleExport} variant="outline" className="flex items-center gap-2">
+        <Button
+          onClick={handleExport}
+          variant="outline"
+          className="flex items-center gap-2"
+        >
           <Download className="h-4 w-4" />
           Export CSV
         </Button>
@@ -239,11 +268,17 @@ const AttendanceRecords: React.FC = () => {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v as any); setCurrentPage(1); }}>
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => {
+                setStatusFilter(v as any);
+                setCurrentPage(1);
+              }}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
@@ -260,7 +295,10 @@ const AttendanceRecords: React.FC = () => {
             <Input
               type="date"
               value={dateFilter}
-              onChange={(e) => { setDateFilter(e.target.value); setCurrentPage(1); }}
+              onChange={(e) => {
+                setDateFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full"
             />
 
@@ -310,24 +348,33 @@ const AttendanceRecords: React.FC = () => {
                           Times
                         </div>
                       </th>
-                      <th className="text-left py-3 px-4 font-medium">Status</th>
+                      <th className="text-left py-3 px-4 font-medium">
+                        Status
+                      </th>
                       <th className="text-left py-3 px-4 font-medium">Hours</th>
                       <th className="text-left py-3 px-4 font-medium">Shift</th>
-                      <th className="text-left py-3 px-4 font-medium">Remarks</th>
+                      <th className="text-left py-3 px-4 font-medium">
+                        Remarks
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {records.map((record) => (
-                      <tr key={record.attendance_id} className="border-b hover:bg-gray-50">
+                      <tr
+                        key={record.attendance_id}
+                        className="border-b hover:bg-gray-50"
+                      >
                         <td className="py-4 px-4">
                           <div>
-                            <div className="font-medium">{record.full_name}</div>
-                            <div className="text-sm text-gray-500">{record.department}</div>
+                            <div className="font-medium">
+                              {record.full_name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {record.department}
+                            </div>
                           </div>
                         </td>
-                        <td className="py-4 px-4">
-                          <div className="text-sm">{formatDate(record.date)}</div>
-                        </td>
+                        <td className="py-4 px-4">{formatDate(record.date)}</td>
                         <td className="py-4 px-4">
                           <div className="text-sm space-y-1">
                             <div>In: {formatTime(record.check_in_time)}</div>
@@ -343,17 +390,15 @@ const AttendanceRecords: React.FC = () => {
                           <div className="text-sm space-y-1">
                             <div>Work: {record.work_hours}h</div>
                             {record.overtime_hours > 0 && (
-                              <div className="text-orange-600">OT: {record.overtime_hours}h</div>
+                              <div className="text-orange-600">
+                                OT: {record.overtime_hours}h
+                              </div>
                             )}
                           </div>
                         </td>
-                        <td className="py-4 px-4">
-                          <span className="text-sm">{record.shift_name}</span>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className="text-sm text-gray-600">
-                            {record.remarks || '-'}
-                          </span>
+                        <td className="py-4 px-4">{record.shift_name}</td>
+                        <td className="py-4 px-4 text-sm text-gray-600">
+                          {record.remarks || "-"}
                         </td>
                       </tr>
                     ))}
@@ -367,7 +412,7 @@ const AttendanceRecords: React.FC = () => {
                 )}
               </div>
 
-              {/* Pagination (server-driven `total`) */}
+              {/* Pagination */}
               {total > 0 && (
                 <div className="flex items-center justify-between mt-6 pt-4 border-t">
                   <div className="text-sm text-gray-500">
