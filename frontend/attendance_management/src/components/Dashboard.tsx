@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import { Users, Clock, UserCheck, UserX, Calendar, TrendingUp } from 'lucide-react';
+import api from '@/utils/interceptor';
 
 /** ---------- Types ---------- */
 interface DashboardData {
@@ -142,9 +143,10 @@ export const Dashboard: React.FC = () => {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:8000?action=dashboard');
-      if (!response.ok) throw new Error('Failed to fetch dashboard data');
-      const raw: RawApi = await response.json();
+      const response = await api('http://localhost:80?action=dashboard');
+      
+      if (!response.statusText) throw new Error('Failed to fetch dashboard data');
+      const raw: RawApi = response.data
       const mapped = mapApiToDashboard(raw);
       setDashboardData(mapped);
       setError(null);

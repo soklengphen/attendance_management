@@ -1,21 +1,67 @@
-import * as React from "react"
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
-import { cn } from "@/lib/utils"
-
-function Input({ className, type, ...props }: React.ComponentProps<"input">) {
-  return (
-    <input
-      type={type}
-      data-slot="input"
-      className={cn(
-        "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-        "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
-        className
-      )}
-      {...props}
-    />
-  )
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  variant?: "default" | "outline" | "transparent"; // example variants
+  inputSize?: "sm" | "md" | "lg"; // renamed from 'size'
+  rightIcon?: React.ReactNode;
+  leftIcon?: React.ReactNode;
 }
 
-export { Input }
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  (
+    {
+      className,
+      type = "text",
+      inputSize = "md",
+      variant = "default",
+      rightIcon,
+      leftIcon,
+      ...props
+    },
+    ref
+  ) => {
+    const sizeClasses = {
+      sm: "h-8 px-2 text-sm",
+      md: "h-10 px-3 text-base", 
+      lg: "h-11 px-4 text-lg",
+    };
+
+    const variantClasses = {
+      default: "border border-input bg-transparent rounded-md",
+      outline: "border-2 border-gray-300 rounded-lg",
+      transparent: "bg-transparent border-none",
+    };
+
+    return (
+      <div className="relative w-full">
+        {leftIcon && (
+          <div className="absolute left-2 top-1/2 -translate-y-1/2">
+            {leftIcon}
+          </div>
+        )}
+        <input
+          type={type}
+          ref={ref}
+          className={cn(
+            "flex w-full rounded-md border bg-transparent py-1 text-base shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary",
+            sizeClasses[inputSize],
+            variantClasses[variant],
+            leftIcon ? "pl-8" : "",
+            rightIcon ? "pr-8" : "",
+            className
+          )}
+          {...props}
+        />
+        {rightIcon && (
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer mt-1 pr-2">
+            {rightIcon}
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+
+Input.displayName = "Input";
+export { Input };
