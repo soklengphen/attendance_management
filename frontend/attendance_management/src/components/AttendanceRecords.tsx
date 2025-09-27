@@ -26,6 +26,7 @@ interface AttendanceRecord {
   shift_name: string;
   work_hours: number;
   overtime_hours: number;
+  leave_type: string;
   remarks: string | null;
 }
 
@@ -52,6 +53,7 @@ type RawAttendance = {
   full_name: string;
   department: string;
   email: string;
+  leave_type: string;
   shift_name?: string;
 };
 
@@ -77,6 +79,7 @@ const mapRaw = (r: RawAttendance): AttendanceRecord => ({
   shift_name: r.shift_name ?? "Shift 1",
   work_hours: Number.parseFloat(r.work_hours || "0") || 0,
   overtime_hours: Number.parseFloat(r.overtime_hours || "0") || 0,
+  leave_type: r.leave_type,
   remarks: r.remarks,
 });
 
@@ -102,6 +105,7 @@ const AttendanceRecords: React.FC = () => {
       const params: Record<string, any> = { limit, offset };
       if (statusFilter !== "all") params.status = statusFilter;
       if (dateFilter) params.date = dateFilter;
+      if (searchTerm) params.search = searchTerm;
 
       const response = await api.get("/?action=attendance", { params });
       const json = response.data;
@@ -134,15 +138,15 @@ const AttendanceRecords: React.FC = () => {
   useEffect(() => {
     fetchRecords();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, statusFilter, dateFilter]);
+  }, [currentPage, statusFilter, dateFilter, searchTerm]);
 
   const handleSearch = () => setCurrentPage(1);
 
   const filteredRecords = records.filter(
     (record) =>
-      record.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.email.toLowerCase().includes(searchTerm.toLowerCase())
+      record.full_name.toLowerCase().includes(searchTerm.toLowerCase())
+    // record.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    // record.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(total / limit) || 1;
@@ -160,6 +164,7 @@ const AttendanceRecords: React.FC = () => {
         "Work Hours",
         "Overtime",
         "Shift",
+        "Leave_Type",
         "Remarks",
       ];
       const csvContent = [
@@ -175,6 +180,7 @@ const AttendanceRecords: React.FC = () => {
             record.work_hours,
             record.overtime_hours,
             record.shift_name,
+            record.leave_type,
             record.remarks || "",
           ]
             .map((v) => {
@@ -227,6 +233,32 @@ const AttendanceRecords: React.FC = () => {
       default:
         return "bg-gray-500 text-white";
     }
+  };
+
+  const getLeaveTypeBadge = (leaveType: string) => {
+    let colorClass = "bg-gray-200 text-gray-800"; // default
+
+    switch (leaveType) {
+      case "Sick":
+        colorClass = "bg-red-100 text-red-800";
+        break;
+      case "Annual":
+        colorClass = "bg-green-100 text-green-800";
+        break;
+      case "Unpaid":
+        colorClass = "bg-yellow-100 text-yellow-800";
+        break;
+      default:
+        colorClass = "bg-gray-100 text-gray-800";
+    }
+
+    return (
+      <span
+        className={`px-2 py-1 rounded-md text-sm font-medium ${colorClass}`}
+      >
+        {leaveType}
+      </span>
+    );
   };
 
   return (
@@ -292,15 +324,24 @@ const AttendanceRecords: React.FC = () => {
               </SelectContent>
             </Select>
 
-            <Input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => {
-                setDateFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full"
-            />
+            <div className="relative w-full">
+              <Input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => {
+                  setDateFilter(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-55 pr-3 appearance-none 
+                [&::-webkit-calendar-picker-indicator]:opacity-0 
+                [&::-webkit-calendar-picker-indicator]:absolute 
+                [&::-webkit-calendar-picker-indicator]:w-full 
+                [&::-webkit-calendar-picker-indicator]:h-full 
+                [&::-webkit-calendar-picker-indicator]:cursor-pointer
+                text-center"
+              />
+              <Calendar className="absolute right-15 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-500 pointer-events-none" />
+            </div>
 
             <Button onClick={handleSearch} className="w-full">
               Apply Filters
@@ -354,6 +395,9 @@ const AttendanceRecords: React.FC = () => {
                       <th className="text-left py-3 px-4 font-medium">Hours</th>
                       <th className="text-left py-3 px-4 font-medium">Shift</th>
                       <th className="text-left py-3 px-4 font-medium">
+                        Leave Type
+                      </th>
+                      <th className="text-left py-3 px-4 font-medium">
                         Remarks
                       </th>
                     </tr>
@@ -397,6 +441,9 @@ const AttendanceRecords: React.FC = () => {
                           </div>
                         </td>
                         <td className="py-4 px-4">{record.shift_name}</td>
+                        <td className="py-4 px-4">
+                          {getLeaveTypeBadge(record.leave_type)}
+                        </td>
                         <td className="py-4 px-4 text-sm text-gray-600">
                           {record.remarks || "-"}
                         </td>

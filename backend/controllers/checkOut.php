@@ -1,6 +1,7 @@
 <?php
 function handleCheckout($input) {
     global $connection;
+    date_default_timezone_set('Asia/Phnom_Penh');
 
     $user_id = $input['user_id'] ?? null;
     $today = date('Y-m-d');

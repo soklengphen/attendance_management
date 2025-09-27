@@ -1,6 +1,7 @@
 <?php
 function handleCheckin($input) {
     global $connection;
+    date_default_timezone_set('Asia/Phnom_Penh');
 
     $user_id  = $input['user_id'] ?? null;
     $shift_id = $input['shift_id'] ?? 1;
