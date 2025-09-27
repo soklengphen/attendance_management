@@ -65,7 +65,28 @@ function handleAttendance($method, $id = null, $input = null, $decoded = null) {
                 break;
             }
 
-            echo json_encode($id ? $result->fetch_assoc() : $result->fetch_all(MYSQLI_ASSOC));
+            $data = $id ? [$result->fetch_assoc()] : $result->fetch_all(MYSQLI_ASSOC);
+
+            // ✅ Auto update status
+            foreach ($data as &$row) {
+                if (isset($row['work_hours']) && floatval($row['work_hours']) == 4 && $row['status'] !== 'Half-day') {
+                    $attendanceId = intval($row['attendance_id']);
+                    $update = $connection->prepare("UPDATE attendance_records SET status = 'Half-day' WHERE attendance_id = ?");
+                    $update->bind_param("i", $attendanceId);
+                    $update->execute();
+                    $row['status'] = 'Half-day'; // reflect change in response
+                } else if (isset($row['work_hours']) && floatval($row['work_hours']) < 4 && $row['status'] !== 'On Leave') {
+                    $attendanceId = intval($row['attendance_id']);
+                    $update = $connection->prepare("UPDATE attendance_records SET status = 'Absent' WHERE attendance_id = ?");
+                    $update->bind_param("i", $attendanceId);
+                    $update->execute();
+                    $row['status'] = 'Absent'; // reflect change in response
+                } else {
+                    
+                }
+            }
+
+            echo json_encode($id ? $data[0] : $data);
             break;
 
         case 'POST':

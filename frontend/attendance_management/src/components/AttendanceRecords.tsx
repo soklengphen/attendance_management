@@ -172,16 +172,16 @@ const AttendanceRecords: React.FC = () => {
         ...filteredRecords.map((record) =>
           [
             record.full_name,
-            record.department,
+            record.department || "--/--",
             record.date,
-            record.check_in_time || "",
-            record.check_out_time || "",
+            record.check_in_time || "--/--",
+            record.check_out_time || "--/--",
             record.status,
             record.work_hours,
             record.overtime_hours,
             record.shift_name,
-            record.leave_type,
-            record.remarks || "",
+            record.leave_type || "--/--",
+            record.remarks || "--/--",
           ]
             .map((v) => {
               const s = String(v);
@@ -235,7 +235,16 @@ const AttendanceRecords: React.FC = () => {
     }
   };
 
-  const getLeaveTypeBadge = (leaveType: string) => {
+  const getLeaveTypeBadge = (leaveType?: string) => {
+    // ✅ Handle no status case
+    if (!leaveType) {
+      return (
+        <span className="px-2 py-1 rounded-md text-sm font-medium bg-gray-200 text-gray-800">
+          --/--
+        </span>
+      );
+    }
+
     let colorClass = "bg-gray-200 text-gray-800"; // default
 
     switch (leaveType) {
