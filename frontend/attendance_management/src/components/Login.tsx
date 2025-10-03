@@ -6,6 +6,7 @@ import { Eye, EyeOff } from "lucide-react";
 import loginBackground from "../assets/login-bg.png";
 import loginIcon from "../assets/Group 160.svg";
 
+
 interface LoginForm {
   full_name?: string;
   email: string;
@@ -40,6 +41,7 @@ export const Login = () => {
       });
       const loginData = await loginResponse.json();
       console.log(loginData);
+      
 
       if (loginResponse.ok && loginData.token) {
         localStorage.setItem("token", loginData.token);
@@ -83,7 +85,7 @@ export const Login = () => {
         if (active === "register") {
           await autoLogin(); // Only call login once
         } else if (active === "login" && data.token) {
-          console.log(data.user);
+        
 
           localStorage.setItem("token", data.token);
           localStorage.setItem("auth", "true");

@@ -39,7 +39,7 @@ function handleUsers($method, $id = null, $input = null) {
                 echo json_encode([
                     "message" => "User created with default password",
                     "user_id" => $connection->insert_id,
-                    "default_password" => $defaultPassword // ⚠️ optional, only if you want to show admin
+                    "default_password" => $defaultPassword 
                 ]);
             } else {
                 echo json_encode(["message" => "full_name and email required"]);
