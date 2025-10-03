@@ -49,6 +49,7 @@ CREATE TABLE attendance_records (
     work_hours DECIMAL(5,2) DEFAULT 0.00,
     overtime_hours DECIMAL(5,2) DEFAULT 0.00,
     remarks VARCHAR(255),
+    leave_type ENUM('Sick', 'Annual', 'Unpaid') DEFAULT NULL;
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,

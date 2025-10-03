@@ -25,6 +25,7 @@ require_once('./controllers/checkIn.php');
 require_once('./controllers/checkOut.php');
 require_once('./controllers/shifts.php');
 require_once('./controllers/dashboard.php');
+require_once('./controllers/onLeave.php');
 
 // ------------------- Helper -------------------
 function jsonResponse($data, $code = 200) {
@@ -72,8 +73,11 @@ switch ($action) {
         break;
 
     case 'checkin':
-        
         handleCheckin($input);
+        break;
+
+    case 'leave':
+        handleLeave($input);
         break;
 
     case 'checkout':

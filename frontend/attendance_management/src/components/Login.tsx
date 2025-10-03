@@ -5,14 +5,17 @@ import { Eye, EyeOff } from "lucide-react";
 
 import loginBackground from "../assets/login-bg.png";
 import loginIcon from "../assets/Group 160.svg";
+import api from "@/utils/interceptor";
 
 
 interface LoginForm {
   full_name?: string;
   email: string;
   password: string;
-  confirmPassword?: string;
+  confirm_password?: string;
 }
+
+const API_BASE = "http://localhost:80";
 
 export const Login = () => {
   const [active, setActive] = useState<"login" | "register">("login");
@@ -22,7 +25,7 @@ export const Login = () => {
     full_name: "",
     email: "",
     password: "",
-    confirmPassword: "",
+    confirm_password: "",
   });
   const [message, setMessage] = useState<string | null>(null);
 
@@ -46,9 +49,13 @@ export const Login = () => {
       if (loginResponse.ok && loginData.token) {
         localStorage.setItem("token", loginData.token);
         localStorage.setItem("auth", "true");
-        localStorage.setItem("user", loginData.user);
+        localStorage.setItem("user", JSON.stringify(loginData.user));
 
-        navigate("/dashboard");
+        if (JSON.stringify(loginData?.user?.role) === "admin") {
+          navigate("/dashboard");
+        } else {
+          navigate("/checkin");
+        }
       } else {
         setMessage(loginData.error || "Auto-login failed");
       }
@@ -61,23 +68,23 @@ export const Login = () => {
     e.preventDefault();
     setMessage(null);
 
-    if (active === "register" && form.password !== form.confirmPassword) {
+    if (active === "register" && form.password !== form.confirm_password) {
       setMessage("Password and confirm password do not match");
       return;
     }
 
     try {
       const action = active === "login" ? "login" : "register";
+      console.log(action);
+      console.log(form);
 
-      const response = await fetch(`http://localhost:80?action=${action}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+      const response = await api.post(`${API_BASE}?action=${action}`, form);
+      console.log(response);
 
-      const data = await response.json();
+      const data = response.data;
+      console.log(data);
 
-      if (!response.ok) {
+      if (!response) {
         setMessage(data.error || "Something went wrong");
       } else {
         setMessage(data.message || "Success!");
@@ -91,7 +98,11 @@ export const Login = () => {
           localStorage.setItem("auth", "true");
           localStorage.setItem("user", JSON.stringify(data.user));
 
-          navigate("/dashboard");
+          if (data.user.role === "admin") {
+            navigate("/dashboard");
+          } else {
+            navigate("/checkin");
+          }
         }
       }
     } catch (error) {
@@ -193,12 +204,12 @@ export const Login = () => {
             {/* Confirm password */}
             {active === "register" && (
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Label htmlFor="confirm_password">Confirm Password</Label>
                 <Input
-                  id="confirmPassword"
+                  id="confirm_password"
                   placeholder="Confirm Password"
                   type={showConfirmPassword ? "text" : "password"}
-                  value={form.confirmPassword}
+                  value={form.confirm_password}
                   onChange={handleChange}
                   rightIcon={
                     <button

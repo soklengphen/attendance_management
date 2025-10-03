@@ -20,18 +20,8 @@ import {
 } from "lucide-react";
 import api from "@/utils/interceptor";
 
-type UserRow = {
-  user_id: number;
-  full_name: string;
-  email?: string;
-  department?: string;
-};
-type ShiftRow = {
-  shift_id: number;
-  shift_name: string;
-  start_time?: string | null;
-  end_time?: string | null;
-};
+type UserRow = { user_id: number; full_name: string; department?: string };
+type ShiftRow = { shift_id: number; shift_name: string };
 type TodayRecord = {
   attendance_id: number;
   user_id: number;
@@ -44,7 +34,6 @@ type TodayRecord = {
   overtime_hours: number | string | null;
   full_name?: string;
   department?: string;
-  email?: string;
   shift_name?: string;
 };
 
@@ -66,6 +55,8 @@ const todayISO = () => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+const leaveTypes = ["Sick", "Annual", "Unpaid"];
+
 const CheckInOut: React.FC = () => {
   // Dropdowns
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -79,7 +70,15 @@ const CheckInOut: React.FC = () => {
   const [todayRec, setTodayRec] = useState<TodayRecord | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  // Ref flags to prevent double API calls in dev
+  // Leave Modal
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [leaveStartDate, setLeaveStartDate] = useState(todayISO());
+  const [leaveEndDate, setLeaveEndDate] = useState(todayISO());
+  const [leaveReason, setLeaveReason] = useState("");
+  const [leaveType, setLeaveType] = useState(leaveTypes[0]);
+  const [leaveSubmitting, setLeaveSubmitting] = useState(false);
+
+  // Ref flags
   const didLoadUsersRef = useRef(false);
   const didLoadShiftsRef = useRef(false);
 
@@ -99,7 +98,6 @@ const CheckInOut: React.FC = () => {
   const loadUsers = async () => {
     if (didLoadUsersRef.current) return;
     didLoadUsersRef.current = true;
-
     try {
       const res = await api(`${API_BASE}?action=users`);
       if (Array.isArray(res.data)) setUsers(res.data);
@@ -112,7 +110,6 @@ const CheckInOut: React.FC = () => {
   const loadShifts = async () => {
     if (didLoadShiftsRef.current) return;
     didLoadShiftsRef.current = true;
-
     try {
       const res = await api(`${API_BASE}?action=shifts`);
       if (Array.isArray(res.data)) setShifts(res.data);
@@ -121,7 +118,7 @@ const CheckInOut: React.FC = () => {
     }
   };
 
-  // Load today's record for selected user
+  // Load today's record
   const loadTodayRecord = async () => {
     if (!selectedUserId) {
       setTodayRec(null);
@@ -132,21 +129,17 @@ const CheckInOut: React.FC = () => {
       const params = new URLSearchParams();
       params.append("date", todayISO());
       params.append("user_id", selectedUserId);
-
       const res = await api(
         `${API_BASE}?action=attendance&${params.toString()}`
       );
-      const json = res.data;
-
-      const list: TodayRecord[] = Array.isArray(json) ? json : [];
+      const list: TodayRecord[] = Array.isArray(res.data) ? res.data : [];
       const todays = list.filter(
         (r) => String(r.user_id) === selectedUserId && r.date === todayISO()
       );
       todays.sort((a, b) =>
         (a.check_in_time || "").localeCompare(b.check_in_time || "")
       );
-      const latest = todays[todays.length - 1] || null;
-      setTodayRec(latest);
+      setTodayRec(todays[todays.length - 1] || null);
     } catch (e) {
       console.error("Failed to load today record:", e);
       setTodayRec(null);
@@ -155,23 +148,17 @@ const CheckInOut: React.FC = () => {
     }
   };
 
-  // Initial loads (once)
   useEffect(() => {
     loadUsers();
     loadShifts();
   }, []);
 
-  // Reload today record when user changes
   useEffect(() => {
     setMessage(null);
     loadTodayRecord();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUserId]);
 
-  // Check In
   const handleCheckIn = async () => {
-    console.log(selectedUserId);
-
     if (!selectedUserId || !selectedShiftId) {
       setMessage(!selectedUserId ? "Select a user" : "Select a shift");
       return;
@@ -184,9 +171,7 @@ const CheckInOut: React.FC = () => {
         shift_id: Number(selectedShiftId),
       };
       const res = await api.post(`${API_BASE}?action=checkin`, body);
-      const json = res.data;
-      
-      setMessage(json?.message || "Checked in");
+      setMessage(res.data?.message || "Checked in");
       await loadTodayRecord();
     } catch (e) {
       console.error(e);
@@ -196,22 +181,60 @@ const CheckInOut: React.FC = () => {
     }
   };
 
-  // Check Out
   const handleCheckOut = async () => {
     if (!selectedUserId) return;
     setPosting("checkout");
     setMessage(null);
     try {
-      const body = { user_id: Number(selectedUserId) };
-      const res = await api.post(`${API_BASE}?action=checkout`,{ user_id: body.user_id});
-      const json = res.data;
-      setMessage(json?.message || "Checked out");
+      const res = await api.post(`${API_BASE}?action=checkout`, {
+        user_id: Number(selectedUserId),
+      });
+      setMessage(res.data?.message || "Checked out");
       await loadTodayRecord();
     } catch (e) {
       console.error(e);
       setMessage("Check-out failed.");
     } finally {
       setPosting(null);
+    }
+  };
+
+  const handleSubmitLeave = async () => {
+    if (!selectedUserId || !leaveReason) {
+      alert("Please fill all required fields");
+      return;
+    }
+
+    if (leaveStartDate > leaveEndDate) {
+      alert("End date cannot be before start date");
+      return;
+    }
+
+    setLeaveSubmitting(true);
+    try {
+      const body = {
+        user_id: Number(selectedUserId),
+        start_date: leaveStartDate,
+        end_date: leaveEndDate,
+        leave_type: leaveType,
+        remarks: leaveReason,
+      };
+      const res = await api.post(`${API_BASE}?action=leave`, body);
+      alert(res.data?.message || "Leave submitted successfully");
+
+      // Reset form
+      setLeaveReason("");
+      setLeaveStartDate(todayISO());
+      setLeaveEndDate(todayISO());
+      setLeaveType(leaveTypes[0]);
+      setLeaveOpen(false);
+
+      await loadTodayRecord();
+    } catch (e) {
+      console.error(e);
+      alert("Failed to submit leave");
+    } finally {
+      setLeaveSubmitting(false);
     }
   };
 
@@ -242,6 +265,105 @@ const CheckInOut: React.FC = () => {
           Select a user and shift, then record attendance.
         </p>
       </div>
+      {/* Leave Button */}
+      {selectedUserId && (
+        <div className="flex justify-end">
+          <Button onClick={() => setLeaveOpen(true)}>Submit Leave</Button>
+        </div>
+      )}
+
+      {/* Leave Modal */}
+      {leaveOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: "rgba(0,0,0,0.3)" }}
+        >
+          <div className="bg-white rounded-xl w-full max-w-md p-6 relative">
+            <h2 className="text-lg font-semibold mb-4">Submit Leave</h2>
+            <div className="space-y-4">
+              {/* Employee */}
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">
+                  Employee
+                </label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-2 py-1 bg-gray-100"
+                  value={selectedUser?.full_name || ""}
+                  readOnly
+                />
+              </div>
+
+              {/* Start Date */}
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={leaveStartDate}
+                  onChange={(e) => setLeaveStartDate(e.target.value)}
+                  className="w-full border rounded px-2 py-1"
+                />
+              </div>
+
+              {/* End Date */}
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={leaveEndDate}
+                  onChange={(e) => setLeaveEndDate(e.target.value)}
+                  className="w-full border rounded px-2 py-1"
+                />
+              </div>
+
+              {/* Leave Type */}
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">
+                  Leave Type
+                </label>
+                <select
+                  value={leaveType}
+                  onChange={(e) => setLeaveType(e.target.value)}
+                  className="w-full border rounded px-2 py-1"
+                >
+                  {leaveTypes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Reason */}
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">
+                  Reason
+                </label>
+                <input
+                  type="text"
+                  value={leaveReason}
+                  onChange={(e) => setLeaveReason(e.target.value)}
+                  className="w-full border rounded px-2 py-1"
+                  placeholder="Enter leave reason"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <Button onClick={handleSubmitLeave} disabled={leaveSubmitting}>
+                {leaveSubmitting ? "Submitting…" : "Submit"}
+              </Button>
+              <Button variant="destructive" onClick={() => setLeaveOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Setup Card */}
       <Card>

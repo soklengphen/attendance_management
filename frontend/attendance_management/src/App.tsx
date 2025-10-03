@@ -18,7 +18,16 @@ import { Login } from "./components/Login";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LayoutDashboard, Clock, Users, Calendar, Menu, X } from "lucide-react";
+import {
+  LayoutDashboard,
+  Clock,
+  Users,
+  Calendar,
+  Menu,
+  X,
+  Info,
+} from "lucide-react";
+import { AboutUs } from "./components/AboutUs";
 
 type NavItem = {
   id: string;
@@ -65,7 +74,27 @@ const navigation: NavItem[] = [
     description: "Manage employees",
     roles: ["admin"],
   },
+  {
+    id: "about-us",
+    name: "About US",
+    path: "/aboutUs",
+    icon: Info,
+    description: "See Our Team",
+    roles: ["admin", "teacher", "employee"],
+  },
 ];
+
+const logout = () => {
+  localStorage.removeItem("auth");
+  localStorage.removeItem("user");
+  window.location.href = "/login";
+};
+
+// Optional small component for redirect
+const LogoutRedirect: React.FC = () => {
+  logout();
+  return null;
+};
 
 // ---------------- Sidebar ----------------
 const Sidebar: React.FC<{
@@ -109,6 +138,8 @@ const Sidebar: React.FC<{
             .filter((item) => item.roles.includes(role)) // ✅ filter by role
             .map((item) => {
               const isActive = location.pathname === item.path;
+              console.log(isActive);
+              
               const Icon = item.icon;
 
               return (
@@ -137,7 +168,7 @@ const Sidebar: React.FC<{
                     </div>
                   </div>
                   {isActive && (
-                    <Badge variant="secondary" className="ml-2">
+                    <Badge variant="secondary" className="ml-2 bg-blue-700 text-white">
                       Active
                     </Badge>
                   )}
@@ -148,19 +179,19 @@ const Sidebar: React.FC<{
 
         {/* Footer */}
         <div className="p-4 border-t">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <div className="text-sm font-medium text-gray-900">
-                  System Status
-                </div>
-                <div className="flex items-center justify-center mt-2">
-                  <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                  <span className="text-xs text-gray-600">Online</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <Button
+            variant="destructive"
+            className="w-full"
+            onClick={() => {
+              // Clear auth info
+              localStorage.removeItem("auth");
+              localStorage.removeItem("user");
+              // Redirect to login
+              window.location.href = "/login";
+            }}
+          >
+            Logout
+          </Button>
         </div>
       </div>
     </div>
@@ -211,17 +242,62 @@ const MainLayout: React.FC = () => {
         {/* Page content */}
         <main className="flex-1 overflow-y-auto p-4">
           <Routes>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/checkin" element={<CheckInOut />} />
-            <Route path="/records" element={<AttendanceRecords />} />
+            {/* Redirect root based on role */}
+            <Route
+              path="/"
+              element={
+                role === "admin" ? (
+                  <Navigate to="/dashboard" replace />
+                ) : (
+                  <Navigate to="/checkin" replace />
+                )
+              }
+            />
+
+            <Route
+              path="/dashboard"
+              element={
+                ["admin", "teacher"].includes(role) ? (
+                  <Dashboard />
+                ) : (
+                  <LogoutRedirect />
+                )
+              }
+            />
+            <Route
+              path="/checkin"
+              element={
+                ["admin", "teacher", "employee"].includes(role) ? (
+                  <CheckInOut />
+                ) : (
+                  <LogoutRedirect />
+                )
+              }
+            />
+            <Route
+              path="/records"
+              element={
+                ["admin", "teacher", "employee"].includes(role) ? (
+                  <AttendanceRecords />
+                ) : (
+                  <LogoutRedirect />
+                )
+              }
+            />
+            <Route
+              path="/aboutUs"
+              element={
+                ["admin", "teacher", "employee"].includes(role) ? (
+                  <AboutUs />
+                ) : (
+                  <LogoutRedirect />
+                )
+              }
+            />
             <Route
               path="/users"
               element={
-                role === "admin" ? (
-                  <UserManagement />
-                ) : (
-                  <Navigate to="/dashboard" replace />
-                )
+                role === "admin" ? <UserManagement /> : <LogoutRedirect />
               }
             />
           </Routes>

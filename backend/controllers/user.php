@@ -1,22 +1,43 @@
 <?php
 require_once __DIR__ . '/../config/connection.php';
 
-function handleUsers($method, $id = null, $input = null) {
+function handleUsers($method, $id = null, $input = null, $decoded = null) {
     global $connection;
+    $authUserId = $decoded['user_id']; // comes from token
+    $authRole   = $decoded['role'];    // comes from token
 
     switch ($method) {
-        case 'GET':
+case 'GET':
             if ($id) {
+                // Non-admin can only see themselves
+                if ($authRole !== 'admin' && $id != $authUserId) {
+                    http_response_code(403);
+                    echo json_encode([["error" => "Unauthorized"]]);
+                    exit;
+                }
+
                 $stmt = $connection->prepare("SELECT * FROM users WHERE user_id = ?");
                 $stmt->bind_param("i", $id);
                 $stmt->execute();
-                echo json_encode($stmt->get_result()->fetch_assoc() ?? ["message" => "User not found"]);
+                $result = $stmt->get_result()->fetch_assoc();
+
+                // Wrap single user in an array
+                echo json_encode($result ? [$result] : []);
             } else {
-                $result = $connection->query("SELECT * FROM users ORDER BY full_name");
-                $users = $result->fetch_all(MYSQLI_ASSOC);
-                echo json_encode($users);
+                if ($authRole === 'admin') {
+                    $result = $connection->query("SELECT * FROM users ORDER BY full_name");
+                    $users = $result->fetch_all(MYSQLI_ASSOC);
+                    echo json_encode($users);
+                } else {
+                    $stmt = $connection->prepare("SELECT * FROM users WHERE user_id = ?");
+                    $stmt->bind_param("i", $authUserId);
+                    $stmt->execute();
+                    $result = $stmt->get_result()->fetch_assoc();
+                    echo json_encode($result ? [$result] : []);
+                }
             }
             break;
+
 
         case 'POST':
             if (isset($input['full_name'], $input['email'])) {

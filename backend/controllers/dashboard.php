@@ -6,13 +6,14 @@ function handleDashboard() {
         echo json_encode(["message" => "Only GET method allowed"]);
         return;
     }
+    date_default_timezone_set('Asia/Phnom_Penh');
 
     $today = date('Y-m-d');
 
     // Get basic stats
     $total_users = $connection->query("SELECT COUNT(*) as count FROM users")->fetch_assoc()['count'];
     $present_today = $connection->query("SELECT COUNT(*) as count FROM attendance_records WHERE date = '$today' AND status = 'Present'")->fetch_assoc()['count'];
-    $absent_today = $connection->query("SELECT COUNT(*) as count FROM attendance_records WHERE date = '$today' AND status = 'Absent'")->fetch_assoc()['count'];
+    $absent_today = $connection->query("SELECT COUNT(*) as count FROM attendance_records WHERE date = '$today' AND status = 'On Leave'")->fetch_assoc()['count'];
     
     // Get recent attendance
     $recent_result = $connection->query("
