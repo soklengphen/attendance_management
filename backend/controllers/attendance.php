@@ -15,46 +15,39 @@ function handleAttendance($method, $id = null, $input = null, $decoded = null) {
                     LEFT JOIN shifts s ON ar.shift_id = s.shift_id";
             $conditions = [];
 
-            // Single record by ID
+           
             if ($id) {
                 $conditions[] = "ar.attendance_id = " . intval($id);
             }
 
-            // Employees only see their own records
             if ($decoded['role'] === 'employee') {
                 $conditions[] = "ar.user_id = " . intval($loggedInUserId);
             }
 
-            // 🔸 Filter: Search by employee name
             if (isset($_GET['search']) && $_GET['search'] !== '') {
                 $search = $connection->real_escape_string($_GET['search']);
                 $conditions[] = "u.full_name LIKE '%$search%'";
             }
 
-            // 🔸 Filter: Status
             if (isset($_GET['status']) && $_GET['status'] !== '') {
                 $status = $connection->real_escape_string($_GET['status']);
                 $conditions[] = "ar.status = '$status'";
             }
 
-            // 🔸 Filter: Date range
             if (isset($_GET['start_date']) && $_GET['start_date'] !== '' && 
                 isset($_GET['end_date']) && $_GET['end_date'] !== '') {
                 $start_date = $connection->real_escape_string($_GET['start_date']);
                 $end_date   = $connection->real_escape_string($_GET['end_date']);
                 $conditions[] = "ar.date BETWEEN '$start_date' AND '$end_date'";
             } elseif (isset($_GET['date']) && $_GET['date'] !== '') {
-                // Exact date match
                 $date = $connection->real_escape_string($_GET['date']);
                 $conditions[] = "ar.date = '$date'";
             }
 
-            // Add conditions to SQL
             if (!empty($conditions)) {
                 $sql .= " WHERE " . implode(" AND ", $conditions);
             }
 
-            // Optional: Order by most recent first
             $sql .= " ORDER BY ar.created_at DESC";
 
             $result = $connection->query($sql);
@@ -67,7 +60,6 @@ function handleAttendance($method, $id = null, $input = null, $decoded = null) {
 
             $data = $id ? [$result->fetch_assoc()] : $result->fetch_all(MYSQLI_ASSOC);
 
-            // ✅ Auto update status
             foreach ($data as &$row) {
                 if (isset($row['work_hours']) && floatval($row['work_hours']) == 4 && $row['status'] !== 'Half-day') {
                     $attendanceId = intval($row['attendance_id']);

@@ -236,7 +236,7 @@ const AttendanceRecords: React.FC = () => {
   };
 
   const getLeaveTypeBadge = (leaveType?: string) => {
-    // ✅ Handle no status case
+
     if (!leaveType) {
       return (
         <span className="px-2 py-1 rounded-md text-sm font-medium bg-gray-200 text-gray-800">
